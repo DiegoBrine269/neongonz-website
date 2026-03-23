@@ -1,6 +1,14 @@
+FROM node:22-alpine AS node-builder
+
+WORKDIR /app
+COPY package.json package-lock.json vite.config.js ./
+COPY resources ./resources
+COPY public ./public
+RUN npm ci && npm run build
+
+# --- imagen principal ---
 FROM php:8.4.5-fpm-alpine3.20
 
-# Dependencias
 RUN apk add --no-cache \
     nginx \
     supervisor \
@@ -22,23 +30,21 @@ RUN docker-php-ext-configure gd --with-freetype --with-jpeg \
         pcntl \
         gd
 
-# Composer
 COPY --from=composer:2.7 /usr/bin/composer /usr/bin/composer
 
 WORKDIR /var/www/html
 
-# Instalar dependencias PHP
 COPY composer.json composer.lock ./
 RUN composer install --no-dev --no-interaction --no-scripts --prefer-dist --optimize-autoloader
 
-# Copiar código
 COPY . .
 
-# Permisos
+# Copiar assets compilados por Vite
+COPY --from=node-builder /app/public/build ./public/build
+
 RUN chown -R www-data:www-data /var/www/html \
     && chmod -R 775 storage bootstrap/cache
 
-# Configs
 COPY docker/nginx.conf /etc/nginx/nginx.conf
 COPY docker/supervisord.conf /etc/supervisor/conf.d/supervisord.conf
 COPY docker/entrypoint.sh /entrypoint.sh

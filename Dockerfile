@@ -1,10 +1,22 @@
+FROM php:8.4.5-fpm-alpine3.20 AS php-builder
+
+RUN apk add --no-cache postgresql-dev libzip-dev oniguruma-dev
+
+RUN docker-php-ext-install pdo pdo_pgsql zip mbstring
+
+COPY --from=composer:2.7 /usr/bin/composer /usr/bin/composer
+
+WORKDIR /var/www/html
+COPY composer.json composer.lock ./
+RUN composer install --no-dev --no-interaction --no-scripts --prefer-dist --optimize-autoloader
+
 FROM node:22-alpine AS node-builder
 
 WORKDIR /app
 COPY package.json package-lock.json vite.config.js ./
 COPY resources ./resources
 COPY public ./public
-COPY vendor ./vendor
+COPY --from=php-builder /var/www/html/vendor ./vendor
 RUN npm ci && npm run build
 
 FROM php:8.4.5-fpm-alpine3.20
@@ -35,7 +47,7 @@ COPY --from=composer:2.7 /usr/bin/composer /usr/bin/composer
 WORKDIR /var/www/html
 
 COPY composer.json composer.lock ./
-RUN composer install --no-dev --no-interaction --no-scripts --prefer-dist --optimize-autoloader
+COPY --from=php-builder /var/www/html/vendor ./vendor
 
 COPY . .
 COPY --from=node-builder /app/public/build ./public/build

@@ -1,12 +1,3 @@
-FROM node:22-alpine AS node-builder
-
-WORKDIR /app
-COPY package.json package-lock.json vite.config.js ./
-COPY resources ./resources
-COPY public ./public
-RUN npm ci && npm run build
-
-# --- imagen principal ---
 FROM php:8.4.5-fpm-alpine3.20
 
 RUN apk add --no-cache \
@@ -38,9 +29,6 @@ COPY composer.json composer.lock ./
 RUN composer install --no-dev --no-interaction --no-scripts --prefer-dist --optimize-autoloader
 
 COPY . .
-
-# Copiar assets compilados por Vite
-COPY --from=node-builder /app/public/build ./public/build
 
 RUN chown -R www-data:www-data /var/www/html \
     && chmod -R 775 storage bootstrap/cache

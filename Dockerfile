@@ -1,16 +1,10 @@
-FROM composer:2.7 AS composer-builder
-
-WORKDIR /app
-COPY composer.json composer.lock ./
-RUN composer install --no-dev --no-interaction --no-scripts --prefer-dist --optimize-autoloader
-
 FROM node:22-alpine AS node-builder
 
 WORKDIR /app
 COPY package.json package-lock.json vite.config.js ./
 COPY resources ./resources
 COPY public ./public
-COPY --from=composer-builder /app/vendor ./vendor
+COPY vendor ./vendor
 RUN npm ci && npm run build
 
 FROM php:8.4.5-fpm-alpine3.20
@@ -41,7 +35,7 @@ COPY --from=composer:2.7 /usr/bin/composer /usr/bin/composer
 WORKDIR /var/www/html
 
 COPY composer.json composer.lock ./
-COPY --from=composer-builder /app/vendor ./vendor
+RUN composer install --no-dev --no-interaction --no-scripts --prefer-dist --optimize-autoloader
 
 COPY . .
 COPY --from=node-builder /app/public/build ./public/build
